@@ -8,10 +8,19 @@ const Event = require('../models/events'); // Importez le modèle Event
 
 router.get('/', async (req, res) => {
     try {
+        // Récupération des événements depuis l'API
         const url = 'https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/que-faire-a-paris-/records?where=address_zipcode=75014&limit=100';
         const response = await fetch(url);
-        const events = await response.json();
-        res.json({ result: true, events: events.results });
+        const eventsFromAPI = await response.json();
+
+        // Récupération des IDs des événements depuis la base de données MongoDB
+        const eventsFromDB = await Event.find({});
+        const eventIDs = eventsFromDB.map(event => event.id);
+
+        // Filtrage des événements récupérés depuis l'API en excluant ceux qui ont un ID présent dans la base de données
+        const filteredEvents = eventsFromAPI.results.filter(event => !eventIDs.includes(event.id));
+
+        res.json({ result: true, events: filteredEvents });
 
     } catch (error) {
         console.error('Error fetching data:', error);
@@ -64,6 +73,25 @@ router.post('/addEvent', async (req, res) => {
         res.status(500).json({ result: false, error: 'Error adding event' });
     }
 });
+
+// Route DELETE pour supprimer un événement par son ID
+router.delete('/deleteEvent/:id', async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const deletedEvent = await Event.deleteOne({ id: eventId });
+
+        if (!deletedEvent) {
+            return res.status(404).json({ result: false, error: 'Event not found' });
+        }
+
+        res.status(200).json({ result: true, message: 'Event deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting event:', error);
+        res.status(500).json({ result: false, error: 'Error deleting event' });
+    }
+});
+
+
 
 
 
